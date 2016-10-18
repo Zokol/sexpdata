@@ -63,7 +63,7 @@ See the source code for more information.
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-__version__ = '0.0.4.dev1'
+__version__ = '0.0.3'
 __author__ = 'Takafumi Arakaki'
 __license__ = 'BSD License'
 __all__ = [
@@ -291,8 +291,8 @@ def dumps(obj, **kwds):
     ("a" "b")
     >>> print(dumps(['a', 'b'], str_as='symbol'))
     (a b)
-    >>> print(dumps(dict(a=1)))
-    (:a 1)
+    >>> print(dumps(dict(a=1, b=2)))
+    (:a 1 :b 2)
     >>> print(dumps([None, True, False, ()]))
     (() t () ())
     >>> print(dumps([None, True, False, ()],
@@ -453,11 +453,20 @@ class SExpBase(object):
 class Symbol(SExpBase):
 
     _lisp_quoted_specials = [
-        ('\\', '\\\\'),    # must come first to avoid doubly quoting "\"
-        ("'", r"\'"), ("`", r"\`"), ('"', r'\"'),
-        ('(', r'\('), (')', r'\)'), ('[', r'\['), (']', r'\]'),
-        (' ', r'\ '), ('.', r'\.'), (',', r'\,'), ('?', r'\?'),
-        (';', r'\;'), ('#', r'\#'),
+        #('\\', '\\\\'),    # must come first to avoid doubly quoting "\"
+        ("'", r"\'"), 
+        ("`", r"\`"), 
+        ('"', r'\"'),
+        ('(', r'\('), 
+        (')', r'\)'), 
+        ('[', r'\['), 
+        (']', r'\]'),
+        (' ', r'\ '), 
+        #('.', r'\.'),
+        (',', r'\,'), 
+        ('?', r'\?'),
+        (';', r'\;'), 
+        ('#', r'\#'),
     ]
 
     _lisp_quoted_to_raw = dict((q, r) for (r, q) in _lisp_quoted_specials)
@@ -469,9 +478,14 @@ class Symbol(SExpBase):
 class String(SExpBase):
 
     _lisp_quoted_specials = [  # from Pymacs
-        ('\\', '\\\\'),    # must come first to avoid doubly quoting "\"
-        ('"', '\\"'), ('\b', '\\b'), ('\f', '\\f'),
-        ('\n', '\\n'), ('\r', '\\r'), ('\t', '\\t')]
+        #('\\', '\\\\'),    # must come first to avoid doubly quoting "\"
+        ('"', '\\"'), 
+        ('\b', '\\b'), 
+        ('\f', '\\f'),
+        ('\n', '\\n'), 
+        ('\r', '\\r'), 
+        #('\t', '\\t')
+        ]
 
     _lisp_quoted_to_raw = dict((q, r) for (r, q) in _lisp_quoted_specials)
 
@@ -500,7 +514,7 @@ class Bracket(SExpBase):
         bra = self._bra
         ket = BRACKETS[self._bra]
         c = ' '.join(tosexp(v) for v in self._val)
-        return uformat("{0}{1}{2}", bra, c, ket)
+        return uformat("\n{0}{1}{2}\n", bra, c, ket)
 
 
 def bracket(val, bra):
@@ -531,10 +545,10 @@ class ExpectNothing(Exception):
 class Parser(object):
 
     closing_brackets = set(BRACKETS.values())
-    _atom_end_basic = \
+    atom_end = \
         set(BRACKETS) | set(closing_brackets) | set('"\'') | set(whitespace)
-    _atom_end_basic_or_escape_regexp = "|".join(map(re.escape,
-                                                    _atom_end_basic | set('\\')))
+    atom_end_or_escape_re = re.compile("|".join(map(re.escape,
+                                                    atom_end | set('\\'))))
     quote_or_escape_re = re.compile(r'"|\\')
 
     def __init__(self, string, string_to=None, nil='nil', true='t', false=None,
@@ -545,10 +559,6 @@ class Parser(object):
         self.false = false
         self.string_to = (lambda x: x) if string_to is None else string_to
         self.line_comment = line_comment
-        self.atom_end = set([line_comment]) | self._atom_end_basic
-        self.atom_end_or_escape_re = \
-            re.compile("{0}|{1}".format(self._atom_end_basic_or_escape_regexp,
-                                        re.escape(line_comment)))
 
     def parse_str(self, i):
         string = self.string
